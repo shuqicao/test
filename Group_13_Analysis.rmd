@@ -1,0 +1,153 @@
+---
+title: "Investigating Influncial Features on Coffee Quality"
+output: 
+  html_document:
+    df_print: paged
+    number_sections: yes
+---
+
+```{r loadpackages, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(kableExtra)
+library(jtools)
+library(sjPlot)
+library(car)
+library(skimr)
+library(corrplot)
+```
+
+
+# introduction
+
+## Research question
+
+What influence do different features of coffee have on whether the quality of a batch of coffee is classified as good or poor?
+
+## Data description
+
+The dataset is collected from the Coffee Quality Database (CQD) of Coffee Quality Institute. As a non-profit organisation, the institute aims to improve the quality of coffee and the lives of farmers who produce the beans. The dataset contains information on features of coffee and its production, including an overall quality score:  
+ 
+* `country_of_origin` – Country where the coffee bean originates from.
+* `aroma` – Aroma grade (ranging from 0-10.)
+* `flavor` – Flavour grade (ranging from 0-10.)
+* `acidity` – Acidity grade (ranging from 0-10.) 
+* `category_two_defects` – Count of category 2 type defects in the batch of coffee beans tested.
+* `altitiude_mean_meters` – Mean altitude of the growers farm (in meters.)
+* `harvested` – Year the batch was harvested.
+* `Qualityclass` – Quality score for the batch (Good - >= 82.5, Poor - < 82.5). (**Note:** 82.5 was selected as the cut off as this is the median score for all the batches tested.)
+
+
+# Explanatory Data Analysis
+
+The dataset can be loaded in and the first few lines can be viewed using the 'head' function. 
+
+```{r data, echo=FALSE, eval=TRUE, warning=TRUE}
+coffee <- read.csv("dataset13.csv")
+head(coffee,n=10)
+```
+
+We will look at `Qualityclass` as our binary response variable (Poor/Good) and select all numerical variables as explanatory variables. 
+
+## Data summarization 
+
+The summary statistics are tabled below:
+
+```{r summary, echo=FALSE, eval=TRUE}
+coffee %>%
+  select(-c(1,8)) %>%
+  skim() %>%
+  select(c(2,3,5,6,7,9,11)) %>%
+  kable(col.names=c("Variables","Missing","Mean","SD","Min","Median","Max"),
+        digits=2,
+        booktabs=TRUE, 
+        linesep="",  
+        caption = 'Summary statistics on all numerical variables') %>%
+  kable_styling(font_size=10, latex_options="HOLD_position")
+```
+
+From the table above, we notice that there are 201 missing observations from the `altitude_mean_meters` variable and 60 missing observations from the `harvested` variable. In addition, the variable of `altitude_mean_meters` has the largest variability which is 9392.09, and the maximum value is 190164 meters; this is out of question since the altitude of the highest mountain (Everest) which is about 8848 meters in the world.
+
+It's also worth noting that some coffee beans get zero in the judgment of their features (`aroma`, `flavour`, `acidity`). We will plot histograms to show distributions of these features. 
+
+```{r hist, echo = FALSE, eval = TRUE, warning = FALSE, fig.width=12, fig.height=6, fig.align = "center", fig.pos = "H", warning = FALSE, fig.cap = "Histogram of variables aroma, flavor and acidity"}
+p1 <- ggplot(coffee, aes(x=aroma))+
+  geom_histogram(color = "white")
+p2 <- ggplot(coffee, aes(x=flavor))+
+  geom_histogram(color = "white")
+p3 <- ggplot(coffee, aes(x=acidity))+
+  geom_histogram(color = "white")
+grid.arrange(p1, p2, p3, ncol = 2)
+```
+
+These histograms show that most of coffee beans get grades between 6 and 8, so we can delete the observation with zero grades which is Honduras. 
+
+## Data cleaning 
+
+After exploring the summary statistics of the data, we decide to delete all the missing observations, the observations with value 0 of `aroma`, `acidity` and `flavor` and the observations with `altitude_mean_meters` greater than 8848 meters.
+
+```{r delete, echo=FALSE, eval=TRUE}
+data <- coffee %>%
+  select(-c(1)) %>%
+  na.omit() %>% 
+  filter(aroma > 0,
+         flavor > 0,
+         acidity > 0,
+         altitude_mean_meters < 8848)
+```
+
+And we set the baseline category for our binary response to `poor`.
+
+```{r level, echo=FALSE, eval=TRUE}
+data$Qualityclass<-factor(data$Qualityclass,level=c("Poor","Good"))
+```
+
+The final version of out data set will be like this:
+
+```{r final, echo=FALSE,eval=TRUE}
+str(data)
+```
+
+## Data visualization
+
+The boxplots of `Qualityclass` against the six explanatory variables are plotted below : 
+
+```{r boxplots, echo=FALSE, eval=TRUE, fig.cap="Boxplot of the Qualityclass against the other feature variables.",warning=FALSE,fig.pos="H",fig.align='center'}
+p1 <- ggplot(data = data, aes(x = Qualityclass, y = aroma)) +
+  geom_boxplot() +
+  labs(x = "quality class", y = "aroma") + 
+  theme(legend.position = "none")
+p2 <- ggplot(data = data, aes(x = Qualityclass, y = flavor)) +
+  geom_boxplot() +
+  labs(x = "quality class", y = "flavor") + 
+  theme(legend.position = "none")
+p3 <- ggplot(data = data, aes(x = Qualityclass, y = acidity)) +
+  geom_boxplot() +
+  labs(x = "quality class", y = "acidity") + 
+  theme(legend.position = "none")
+p4 <- ggplot(data = data, aes(x = Qualityclass, y = category_two_defects)) +
+  geom_boxplot() +
+  labs(x = "quality class", y = "category_two_defects") + 
+  theme(legend.position = "none")
+p5 <- ggplot(data = data, aes(x = Qualityclass, y = altitude_mean_meters)) +
+  geom_boxplot() +
+  labs(x = "quality class", y = "altitude_mean_meters") + 
+  theme(legend.position = "none")
+p6<-ggplot(data = data, aes(x = Qualityclass, y = harvested)) +
+  geom_boxplot()+
+  labs(x = "quality class", y = "harvested") + 
+  theme(legend.position = "none")
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol=3)
+```
+
+From the boxplots, we can see that the difference between quality class of good and poor against aroma, acidity and flavor is obvious since the the boxplots do not overlap with each other. However, it seems that there is no significant difference between quality class against the other variables. Then we would expect that aroma, acidity and flavor will have a strong influence to the quality class of a certain batch of coffee.
+
+The correlation plot of all numerical variables is plotted below:
+
+```{r corrp, echo=FALSE, eval=TRUE, warning=FALSE, fig.pos="H", fig.align='center', fig.cap="Correlation matrix plot of numerical variables"}
+corrplot(cor(data[,-7]),method = "number")
+```
+
+From the correlation matrix plot, we notice a strong correlation between aroma, flavor and acidity, with the correlation coefficients of 0.73, 0.74 and 0.59, respectively. This can be explained by that these three variables are the basic standard to judge if the quality of a certain batch of coffee is good or poor. To fit our model well, we think the problem of multicollinearity should be considered, and we will discuss this issue in the next section.
+
+
