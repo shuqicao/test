@@ -8,7 +8,7 @@ Allocated with a dataset from Coffee Quality Database (CQD), we intend to invest
 
 ## Usage
 
-You can see the final edition of code stored in [Group_13_Analysis.Rmd](Group_13_Analysis.Rmd).
+You can see the final edition of code stored in [Group_13_Analysis.rmd](Group_13_Analysis.rmd).
 ## Maintainers and Collabrators
 
 - [@shuqicao](https://github.com/shuqicao).
